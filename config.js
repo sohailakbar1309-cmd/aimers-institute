@@ -28,8 +28,8 @@
  * ------------------------------------------------------------------
  */
 window.AIMERS_CONFIG = {
-  SUPABASE_URL: 'YOUR_SUPABASE_PROJECT_URL', // e.g. 'https://xxxxxxxxxxxx.supabase.co'
-  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY',
+  SUPABASE_URL: https://slendfuykmmbvqxbymox.supabase.co
+  SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsZW5kZnV5a21tYnZxeGJ5bW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMDAzNDksImV4cCI6MjEwMzY3NjM0OX0.hEJXKVQt4R4nePDcIWZKxLtKRXxDXsR1eY8zIPzzmm4
 
   // Explicit, non-default opt-in to development mock auth (see
   // dev-mock-provider.js). Must be turned on deliberately — the app
