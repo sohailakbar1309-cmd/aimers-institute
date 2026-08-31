@@ -77,7 +77,7 @@ const AuthState = (() => {
     async init() {
       set({ status: 'initializing' });
       try {
-        const session = await window.AimersAuthService.getSession();
+        const session = await Promise.race([window.AimersAuthService.getSession(), new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 6000))]);
         if (!session) {
           set({ status: 'unauthenticated', user: null, role: null, sessionToken: null, profileStatus: null, error: null });
           return;
