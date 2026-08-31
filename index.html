@@ -236,6 +236,16 @@
           <div class="stat-card"><span class="t-caption">Courses</span><span class="t-stat">—</span><span class="badge badge-muted">No data</span></div>
         </div>
         <div>
+          <div class="section-head"><h2 class="t-h2">My batch</h2></div>
+          <div class="card-row card" id="sd-batch-card" style="cursor:pointer;">
+            <div class="card-icon" id="sd-batch-icon">B</div>
+            <div class="grow flex-col gap-2">
+              <div class="t-h3" id="sd-batch-name">No batch assigned yet</div>
+              <div class="t-body" style="font-size:var(--fs-support);" id="sd-batch-sub">View your student profile for admission details.</div>
+            </div>
+          </div>
+        </div>
+        <div>
           <div class="section-head"><h2 class="t-h2">Today's schedule</h2></div>
           <div class="empty-state">
             <div class="empty-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
@@ -309,6 +319,7 @@
           <div class="stat-card"><span class="t-caption">Teachers</span><span class="t-stat">—</span><span class="badge badge-muted">No data</span></div>
           <div class="stat-card"><span class="t-caption">Batches</span><span class="t-stat">—</span><span class="badge badge-muted">No data</span></div>
         </div>
+        <button class="btn btn-secondary" id="ad-manage-students-btn">Manage students</button>
         <div>
           <div class="section-head"><h2 class="t-h2">Announcements</h2></div>
           <div class="card">
@@ -363,6 +374,298 @@
     </div>
   </section>
 
+  <!-- ===================== STUDENT PROFILE (student's own record) ===================== -->
+  <section class="screen" id="screen-student-profile">
+    <div class="auth-header">
+      <div class="auth-back">
+        <button class="btn btn-icon btn-secondary" id="sp-back" aria-label="Go back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="dash-scroll">
+
+        <div id="sp-loading" class="flex-col gap-3">
+          <div class="skeleton" style="height:76px; width:76px; border-radius:999px; margin:0 auto;"></div>
+          <div class="skeleton" style="height:18px; width:60%; margin:12px auto 0; border-radius:8px;"></div>
+          <div class="skeleton" style="height:120px; border-radius:14px; margin-top:16px;"></div>
+        </div>
+
+        <div id="sp-empty" class="empty-state" hidden>
+          <div class="empty-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+          </div>
+          <div class="t-h3">Your student profile hasn't been configured yet.</div>
+          <div class="t-body" style="font-size:var(--fs-support);">Please contact the institute administrator to get your student record set up.</div>
+        </div>
+
+        <div id="sp-content" hidden>
+          <div class="profile-header" style="padding-top:0;">
+            <div class="avatar-lg" id="sp-avatar-initial">?</div>
+            <div>
+              <div class="t-h2" id="sp-name">—</div>
+              <div class="t-support" id="sp-email">—</div>
+            </div>
+            <span class="role-tag" id="sp-status-badge">—</span>
+          </div>
+          <div class="card flex-col gap-3">
+            <div class="row-between"><span class="t-label">Admission number</span><span class="t-body" id="sp-admission-number" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Phone</span><span class="t-body" id="sp-phone" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Batch</span><span class="t-body" id="sp-batch" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Admission date</span><span class="t-body" id="sp-admission-date" style="color:var(--color-text-primary);">—</span></div>
+          </div>
+        </div>
+
+        <div id="sp-error" class="alert alert-error" hidden><span id="sp-error-msg"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== ADMIN — STUDENT LIST ===================== -->
+  <section class="screen" id="screen-admin-student-list">
+    <div class="dash-header">
+      <div>
+        <div class="t-caption">Aimers Institute</div>
+        <div class="t-h1 mt-1">Students</div>
+      </div>
+      <button class="btn btn-icon btn-secondary" id="asl-back" aria-label="Back to dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
+    <div class="scroll">
+      <div class="dash-scroll">
+        <div class="flex gap-2">
+          <div class="field grow" style="gap:0;">
+            <input class="input" id="asl-search-input" type="text" placeholder="Search by admission number">
+          </div>
+          <select class="input" id="asl-status-filter" style="width:132px; flex-shrink:0;">
+            <option value="">All status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="graduated">Graduated</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+
+        <button class="btn btn-primary" id="asl-add-btn">+ Add student</button>
+
+        <div id="asl-loading" class="flex-col gap-3">
+          <div class="skeleton" style="height:64px; border-radius:14px;"></div>
+          <div class="skeleton" style="height:64px; border-radius:14px;"></div>
+          <div class="skeleton" style="height:64px; border-radius:14px;"></div>
+        </div>
+
+        <div id="asl-empty" class="empty-state" hidden>
+          <div class="empty-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          </div>
+          <div class="t-h3" id="asl-empty-title">No students have been added yet.</div>
+        </div>
+
+        <div id="asl-error" class="alert alert-error" hidden><span id="asl-error-msg"></span></div>
+
+        <div id="asl-list" class="flex-col gap-3"></div>
+
+        <div id="asl-pagination" class="row-between mt-2" hidden>
+          <button class="btn btn-secondary" id="asl-prev-btn" style="width:auto; padding:0 var(--space-4);">Prev</button>
+          <span class="t-support" id="asl-page-label">Page 1</span>
+          <button class="btn btn-secondary" id="asl-next-btn" style="width:auto; padding:0 var(--space-4);">Next</button>
+        </div>
+      </div>
+    </div>
+    <nav class="bottom-nav"></nav>
+  </section>
+
+  <!-- ===================== ADMIN — ADD STUDENT ===================== -->
+  <section class="screen" id="screen-admin-student-add">
+    <div class="auth-header">
+      <div class="auth-back">
+        <button class="btn btn-icon btn-secondary" id="asa-back" aria-label="Go back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+      </div>
+      <h1 class="t-h1 mt-3">Add student</h1>
+      <p class="t-body mt-1">First find the Aimers Institute account this student record belongs to.</p>
+    </div>
+    <div class="auth-body">
+
+      <div id="asa-lookup-error" class="alert alert-error" hidden><span></span></div>
+
+      <div class="field">
+        <label class="t-label" for="asa-lookup-email">Student's account email</label>
+        <input class="input" id="asa-lookup-email" type="email" placeholder="student@example.com" autocomplete="off">
+        <div class="field-hint">They must already have signed in to Aimers Institute at least once.</div>
+      </div>
+      <button class="btn btn-secondary" id="asa-lookup-btn">
+        <span id="asa-lookup-btn-label">Find account</span>
+        <div class="spinner spinner-dark" id="asa-lookup-spinner" hidden></div>
+      </button>
+
+      <div id="asa-lookup-result" class="card" hidden>
+        <div class="row-between mb-2"><span class="badge badge-success">Account found</span></div>
+        <div class="t-h3" id="asa-found-name">—</div>
+        <div class="t-support" id="asa-found-email">—</div>
+      </div>
+
+      <form id="asa-form" novalidate hidden>
+        <div class="flex-col gap-3">
+          <div class="field">
+            <label class="t-label" for="asa-admission-number">Admission number</label>
+            <input class="input" id="asa-admission-number" type="text" autocomplete="off">
+            <div class="field-error" id="asa-admission-number-error" hidden></div>
+          </div>
+          <div class="field">
+            <label class="t-label" for="asa-batch">Batch</label>
+            <select class="input" id="asa-batch"><option value="">No batch yet</option></select>
+          </div>
+          <div class="field">
+            <label class="t-label" for="asa-admission-date">Admission date</label>
+            <input class="input" id="asa-admission-date" type="date">
+          </div>
+          <div class="field">
+            <label class="t-label" for="asa-status">Status</label>
+            <select class="input" id="asa-status">
+              <option value="active" selected>Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="graduated">Graduated</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="t-label" for="asa-dob">Date of birth <span class="t-support">(optional)</span></label>
+            <input class="input" id="asa-dob" type="date">
+          </div>
+          <div class="field">
+            <label class="t-label" for="asa-gender">Gender <span class="t-support">(optional)</span></label>
+            <select class="input" id="asa-gender">
+              <option value="">Prefer not to say</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="t-label" for="asa-guardian-name">Guardian name <span class="t-support">(optional)</span></label>
+            <input class="input" id="asa-guardian-name" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="t-label" for="asa-guardian-phone">Guardian phone <span class="t-support">(optional)</span></label>
+            <input class="input" id="asa-guardian-phone" type="tel" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="t-label" for="asa-address">Address <span class="t-support">(optional)</span></label>
+            <input class="input" id="asa-address" type="text" autocomplete="off">
+          </div>
+
+          <div id="asa-form-error" class="alert alert-error" hidden><span></span></div>
+
+          <button class="btn btn-primary" type="submit" id="asa-submit-btn">
+            <span id="asa-submit-btn-label">Create student record</span>
+            <div class="spinner" id="asa-submit-spinner" hidden></div>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===================== ADMIN — STUDENT DETAIL ===================== -->
+  <section class="screen" id="screen-admin-student-detail">
+    <div class="auth-header">
+      <div class="auth-back">
+        <button class="btn btn-icon btn-secondary" id="asd-back" aria-label="Go back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="dash-scroll">
+
+        <div id="asd-loading" class="flex-col gap-3">
+          <div class="skeleton" style="height:76px; width:76px; border-radius:999px; margin:0 auto;"></div>
+          <div class="skeleton" style="height:200px; border-radius:14px; margin-top:16px;"></div>
+        </div>
+
+        <div id="asd-error" class="alert alert-error" hidden><span id="asd-error-msg"></span></div>
+
+        <div id="asd-content" hidden>
+          <div class="profile-header" style="padding-top:0;">
+            <div class="avatar-lg" id="asd-avatar-initial">?</div>
+            <div>
+              <div class="t-h2" id="asd-name">—</div>
+              <div class="t-support" id="asd-email">—</div>
+            </div>
+          </div>
+
+          <div class="card flex-col gap-3">
+            <div class="row-between"><span class="t-label">Admission number</span><span class="t-body" id="asd-admission-number" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Status</span><span class="badge" id="asd-status-badge">—</span></div>
+          </div>
+
+          <div class="section-head mt-2"><h2 class="t-h2">Change status</h2></div>
+          <div class="flex gap-2">
+            <select class="input" id="asd-status-select">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="graduated">Graduated</option>
+              <option value="suspended">Suspended</option>
+            </select>
+            <button class="btn btn-secondary" id="asd-status-save-btn" style="width:auto; padding:0 var(--space-4); flex-shrink:0;">
+              <span id="asd-status-save-label">Update</span>
+              <div class="spinner spinner-dark" id="asd-status-spinner" hidden></div>
+            </button>
+          </div>
+
+          <div class="section-head mt-2"><h2 class="t-h2">Edit details</h2></div>
+          <form id="asd-form" novalidate>
+            <div class="flex-col gap-3">
+              <div class="field">
+                <label class="t-label" for="asd-batch">Batch</label>
+                <select class="input" id="asd-batch"><option value="">No batch</option></select>
+              </div>
+              <div class="field">
+                <label class="t-label" for="asd-admission-date">Admission date</label>
+                <input class="input" id="asd-admission-date" type="date">
+              </div>
+              <div class="field">
+                <label class="t-label" for="asd-dob">Date of birth</label>
+                <input class="input" id="asd-dob" type="date">
+              </div>
+              <div class="field">
+                <label class="t-label" for="asd-gender">Gender</label>
+                <select class="input" id="asd-gender">
+                  <option value="">Prefer not to say</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="t-label" for="asd-guardian-name">Guardian name</label>
+                <input class="input" id="asd-guardian-name" type="text" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="t-label" for="asd-guardian-phone">Guardian phone</label>
+                <input class="input" id="asd-guardian-phone" type="tel" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="t-label" for="asd-address">Address</label>
+                <input class="input" id="asd-address" type="text" autocomplete="off">
+              </div>
+
+              <div id="asd-form-error" class="alert alert-error" hidden><span></span></div>
+
+              <button class="btn btn-primary" type="submit" id="asd-save-btn">
+                <span id="asd-save-btn-label">Save changes</span>
+                <div class="spinner" id="asd-save-spinner" hidden></div>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="toast-wrap"><div class="toast" id="toast"><span id="toast-msg">Saved</span></div></div>
 </div>
 
@@ -372,6 +675,7 @@
 <script src="dev-mock-provider.js"></script>
 <script src="supabase-auth-provider.js"></script>
 <script src="auth-state.js"></script>
+<script src="student-service.js"></script>
 <script src="permissions.js"></script>
 <script src="router.js"></script>
 <script src="app.js"></script>

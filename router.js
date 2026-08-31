@@ -29,6 +29,11 @@ const SCREEN_CONFIG = Object.freeze({
   'dashboard-teacher': { access: ['teacher'] },
   'dashboard-admin': { access: ['admin'] },
   profile: { access: 'auth-only' },
+
+  'student-profile': { access: ['student'] },
+  'admin-student-list': { access: ['admin'] },
+  'admin-student-add': { access: ['admin'] },
+  'admin-student-detail': { access: ['admin'] },
 });
 
 const Router = (() => {
