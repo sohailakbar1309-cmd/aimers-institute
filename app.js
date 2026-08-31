@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initForgotPasswordForm();
   initPasswordResetForm();
   initLogoutFlow();
-  initAuthListener();
+  try { initAuthListener(); } catch (e) { console.warn('Auth listener failed:', e); }
 
   document.getElementById('welcome-login-btn').addEventListener('click', () => Router.go('login'));
   document.getElementById('login-back').addEventListener('click', () => Router.go('welcome'));
