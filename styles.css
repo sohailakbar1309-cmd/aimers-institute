@@ -46,6 +46,7 @@
 }
 
 *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+[hidden]{display:none !important;}
 html,body{height:100%;}
 body{font-family:var(--font-body); background:var(--color-bg); color:var(--color-text-primary); overflow:hidden;}
 button,input{font-family:inherit;}
