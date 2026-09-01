@@ -288,6 +288,16 @@
           <div class="stat-card"><span class="t-caption">Tests due</span><span class="t-stat">—</span><span class="badge badge-muted">No data</span></div>
         </div>
         <div>
+          <div class="section-head"><h2 class="t-h2">My profile</h2></div>
+          <div class="card-row card" id="td-profile-card" style="cursor:pointer;">
+            <div class="card-icon" id="td-profile-icon">T</div>
+            <div class="grow flex-col gap-2">
+              <div class="t-h3" id="td-subject-name">No teacher profile yet</div>
+              <div class="t-body" style="font-size:var(--fs-support);" id="td-profile-sub">Contact the institute administrator to get set up.</div>
+            </div>
+          </div>
+        </div>
+        <div>
           <div class="section-head"><h2 class="t-h2">Assigned batches</h2></div>
           <div class="empty-state">
             <div class="empty-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
@@ -320,6 +330,7 @@
           <div class="stat-card"><span class="t-caption">Batches</span><span class="t-stat">—</span><span class="badge badge-muted">No data</span></div>
         </div>
         <button class="btn btn-secondary" id="ad-manage-students-btn">Manage students</button>
+        <button class="btn btn-secondary" id="ad-manage-teachers-btn">Manage teachers</button>
         <div>
           <div class="section-head"><h2 class="t-h2">Announcements</h2></div>
           <div class="card">
@@ -666,6 +677,231 @@
     </div>
   </section>
 
+  <!-- ===================== TEACHER PROFILE (own record) ===================== -->
+  <section class="screen" id="screen-teacher-profile">
+    <div class="auth-header">
+      <div class="auth-back">
+        <button class="btn btn-icon btn-secondary" id="tp-back" aria-label="Go back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="dash-scroll">
+        <div id="tp-loading" class="flex-col gap-3">
+          <div class="skeleton" style="height:76px; width:76px; border-radius:999px; margin:0 auto;"></div>
+          <div class="skeleton" style="height:120px; border-radius:14px; margin-top:16px;"></div>
+        </div>
+        <div id="tp-empty" class="empty-state" hidden>
+          <div class="empty-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg></div>
+          <div class="t-h3">Your teacher profile hasn't been configured yet.</div>
+          <div class="t-body" style="font-size:var(--fs-support);">Please contact the institute administrator to get your teacher record set up.</div>
+        </div>
+        <div id="tp-content" hidden>
+          <div class="profile-header" style="padding-top:0;">
+            <div class="avatar-lg" id="tp-avatar-initial">?</div>
+            <div>
+              <div class="t-h2" id="tp-name">—</div>
+              <div class="t-support" id="tp-email">—</div>
+            </div>
+            <span class="role-tag" id="tp-status-badge">—</span>
+          </div>
+          <div class="card flex-col gap-3">
+            <div class="row-between"><span class="t-label">Employee code</span><span class="t-body" id="tp-employee-code" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Phone</span><span class="t-body" id="tp-phone" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Subject</span><span class="t-body" id="tp-subject" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Qualification</span><span class="t-body" id="tp-qualification" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Joining date</span><span class="t-body" id="tp-joining-date" style="color:var(--color-text-primary);">—</span></div>
+          </div>
+        </div>
+        <div id="tp-error" class="alert alert-error" hidden><span id="tp-error-msg"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== ADMIN — TEACHER LIST ===================== -->
+  <section class="screen" id="screen-admin-teacher-list">
+    <div class="dash-header">
+      <div>
+        <div class="t-caption">Aimers Institute</div>
+        <div class="t-h1 mt-1">Teachers</div>
+      </div>
+      <button class="btn btn-icon btn-secondary" id="atl-back" aria-label="Back to dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
+    <div class="scroll">
+      <div class="dash-scroll">
+        <div class="flex gap-2">
+          <div class="field grow" style="gap:0;"><input class="input" id="atl-search-input" type="text" placeholder="Search name, code, or subject"></div>
+          <select class="input" id="atl-status-filter" style="width:132px; flex-shrink:0;">
+            <option value="">All status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="on_leave">On leave</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="atl-add-btn">+ Add teacher</button>
+        <div id="atl-loading" class="flex-col gap-3">
+          <div class="skeleton" style="height:64px; border-radius:14px;"></div>
+          <div class="skeleton" style="height:64px; border-radius:14px;"></div>
+          <div class="skeleton" style="height:64px; border-radius:14px;"></div>
+        </div>
+        <div id="atl-empty" class="empty-state" hidden>
+          <div class="empty-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+          <div class="t-h3" id="atl-empty-title">No teachers have been added yet.</div>
+        </div>
+        <div id="atl-error" class="alert alert-error" hidden><span id="atl-error-msg"></span></div>
+        <div id="atl-list" class="flex-col gap-3"></div>
+        <div id="atl-pagination" class="row-between mt-2" hidden>
+          <button class="btn btn-secondary" id="atl-prev-btn" style="width:auto; padding:0 var(--space-4);">Prev</button>
+          <span class="t-support" id="atl-page-label">Page 1</span>
+          <button class="btn btn-secondary" id="atl-next-btn" style="width:auto; padding:0 var(--space-4);">Next</button>
+        </div>
+      </div>
+    </div>
+    <nav class="bottom-nav"></nav>
+  </section>
+
+  <!-- ===================== ADMIN — ADD TEACHER ===================== -->
+  <section class="screen" id="screen-admin-teacher-add">
+    <div class="auth-header">
+      <div class="auth-back">
+        <button class="btn btn-icon btn-secondary" id="ata-back" aria-label="Go back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+      </div>
+      <h1 class="t-h1 mt-3">Add teacher</h1>
+      <p class="t-body mt-1">First find the Aimers Institute account this teacher record belongs to.</p>
+    </div>
+    <div class="auth-body">
+      <div id="ata-lookup-error" class="alert alert-error" hidden><span></span></div>
+      <div class="field">
+        <label class="t-label" for="ata-lookup-email">Teacher's account email</label>
+        <input class="input" id="ata-lookup-email" type="email" placeholder="teacher@example.com" autocomplete="off">
+        <div class="field-hint">They must already have signed in to Aimers Institute at least once.</div>
+      </div>
+      <button class="btn btn-secondary" id="ata-lookup-btn">
+        <span id="ata-lookup-btn-label">Find account</span>
+        <div class="spinner spinner-dark" id="ata-lookup-spinner" hidden></div>
+      </button>
+      <div id="ata-lookup-result" class="card" hidden>
+        <div class="row-between mb-2"><span class="badge badge-success">Account found</span></div>
+        <div class="t-h3" id="ata-found-name">—</div>
+        <div class="t-support" id="ata-found-email">—</div>
+      </div>
+      <form id="ata-form" novalidate hidden>
+        <div class="flex-col gap-3">
+          <div class="field">
+            <label class="t-label" for="ata-employee-code">Employee code</label>
+            <input class="input" id="ata-employee-code" type="text" autocomplete="off">
+            <div class="field-error" id="ata-employee-code-error" hidden></div>
+          </div>
+          <div class="field">
+            <label class="t-label" for="ata-subject">Subject <span class="t-support">(optional)</span></label>
+            <input class="input" id="ata-subject" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="t-label" for="ata-qualification">Qualification <span class="t-support">(optional)</span></label>
+            <input class="input" id="ata-qualification" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="t-label" for="ata-phone">Phone <span class="t-support">(optional)</span></label>
+            <input class="input" id="ata-phone" type="tel" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="t-label" for="ata-joining-date">Joining date</label>
+            <input class="input" id="ata-joining-date" type="date">
+          </div>
+          <div class="field">
+            <label class="t-label" for="ata-status">Status</label>
+            <select class="input" id="ata-status">
+              <option value="active" selected>Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="on_leave">On leave</option>
+            </select>
+          </div>
+          <div id="ata-form-error" class="alert alert-error" hidden><span></span></div>
+          <button class="btn btn-primary" type="submit" id="ata-submit-btn">
+            <span id="ata-submit-btn-label">Create teacher record</span>
+            <div class="spinner" id="ata-submit-spinner" hidden></div>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===================== ADMIN — TEACHER DETAIL ===================== -->
+  <section class="screen" id="screen-admin-teacher-detail">
+    <div class="auth-header">
+      <div class="auth-back">
+        <button class="btn btn-icon btn-secondary" id="atd-back" aria-label="Go back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="dash-scroll">
+        <div id="atd-loading" class="flex-col gap-3">
+          <div class="skeleton" style="height:76px; width:76px; border-radius:999px; margin:0 auto;"></div>
+          <div class="skeleton" style="height:200px; border-radius:14px; margin-top:16px;"></div>
+        </div>
+        <div id="atd-error" class="alert alert-error" hidden><span id="atd-error-msg"></span></div>
+        <div id="atd-content" hidden>
+          <div class="profile-header" style="padding-top:0;">
+            <div class="avatar-lg" id="atd-avatar-initial">?</div>
+            <div>
+              <div class="t-h2" id="atd-name">—</div>
+              <div class="t-support" id="atd-email">—</div>
+            </div>
+          </div>
+          <div class="card flex-col gap-3">
+            <div class="row-between"><span class="t-label">Employee code</span><span class="t-body" id="atd-employee-code" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Status</span><span class="badge" id="atd-status-badge">—</span></div>
+          </div>
+          <div class="section-head mt-2"><h2 class="t-h2">Change status</h2></div>
+          <div class="flex gap-2">
+            <select class="input" id="atd-status-select">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="on_leave">On leave</option>
+            </select>
+            <button class="btn btn-secondary" id="atd-status-save-btn" style="width:auto; padding:0 var(--space-4); flex-shrink:0;">
+              <span id="atd-status-save-label">Update</span>
+              <div class="spinner spinner-dark" id="atd-status-spinner" hidden></div>
+            </button>
+          </div>
+          <div class="section-head mt-2"><h2 class="t-h2">Edit details</h2></div>
+          <form id="atd-form" novalidate>
+            <div class="flex-col gap-3">
+              <div class="field">
+                <label class="t-label" for="atd-subject">Subject</label>
+                <input class="input" id="atd-subject" type="text" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="t-label" for="atd-qualification">Qualification</label>
+                <input class="input" id="atd-qualification" type="text" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="t-label" for="atd-phone">Phone</label>
+                <input class="input" id="atd-phone" type="tel" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="t-label" for="atd-joining-date">Joining date</label>
+                <input class="input" id="atd-joining-date" type="date">
+              </div>
+              <div id="atd-form-error" class="alert alert-error" hidden><span></span></div>
+              <button class="btn btn-primary" type="submit" id="atd-save-btn">
+                <span id="atd-save-btn-label">Save changes</span>
+                <div class="spinner" id="atd-save-spinner" hidden></div>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="toast-wrap"><div class="toast" id="toast"><span id="toast-msg">Saved</span></div></div>
 </div>
 
@@ -676,6 +912,7 @@
 <script src="supabase-auth-provider.js"></script>
 <script src="auth-state.js"></script>
 <script src="student-service.js"></script>
+<script src="teacher-service.js"></script>
 <script src="permissions.js"></script>
 <script src="router.js"></script>
 <script src="app.js"></script>

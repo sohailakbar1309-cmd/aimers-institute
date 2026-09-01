@@ -212,6 +212,7 @@ function renderDashboardForRole() {
   buildNav(role);
 
   if (role === 'student') loadStudentDashboardBatchCard();
+  if (role === 'teacher') loadTeacherDashboardCard();
 }
 
 function buildNav(role) {
@@ -233,6 +234,11 @@ function handleNavClick(key) {
   if (key === 'students' && AuthState.getState().role === 'admin') {
     Router.go('admin-student-list');
     loadAdminStudentList(0);
+    return;
+  }
+  if (key === 'teachers' && AuthState.getState().role === 'admin') {
+    Router.go('admin-teacher-list');
+    loadAdminTeacherList(0);
     return;
   }
   showToast(key.charAt(0).toUpperCase() + key.slice(1) + ' module coming in a later phase');
@@ -596,6 +602,333 @@ function initStudentManagementNav() {
   initAdminStudentDetail();
 }
 
+// ==================== TEACHER MANAGEMENT (Phase 5) ====================
+
+function loadTeacherDashboardCard() {
+  const { user } = AuthState.getState();
+  const nameEl = document.getElementById('td-subject-name');
+  const subEl = document.getElementById('td-profile-sub');
+  if (!user || !user.id || !nameEl) return;
+  TeacherService.getCurrentTeacher(user.id).then(teacher => {
+    if (!teacher) {
+      nameEl.textContent = 'No teacher profile yet';
+      subEl.textContent = 'Contact the institute administrator to get set up.';
+      return;
+    }
+    nameEl.textContent = teacher.subject || 'No subject set';
+    subEl.textContent = `Employee #${teacher.employee_code} · ${teacher.status}`;
+  }).catch(() => {
+    nameEl.textContent = 'Could not load profile';
+    subEl.textContent = 'Pull to refresh or try again shortly.';
+  });
+}
+
+async function openTeacherProfile() {
+  Router.go('teacher-profile');
+  const loading = document.getElementById('tp-loading');
+  const empty = document.getElementById('tp-empty');
+  const content = document.getElementById('tp-content');
+  const errorBox = document.getElementById('tp-error');
+  loading.hidden = false; empty.hidden = true; content.hidden = true; errorBox.hidden = true;
+
+  const { user } = AuthState.getState();
+  try {
+    const teacher = await TeacherService.getCurrentTeacher(user.id);
+    loading.hidden = true;
+    if (!teacher) { empty.hidden = false; return; }
+
+    document.getElementById('tp-avatar-initial').textContent = (user.fullName || user.email || '?').trim().charAt(0).toUpperCase();
+    document.getElementById('tp-name').textContent = user.fullName || '—';
+    document.getElementById('tp-email').textContent = user.email || '—';
+    document.getElementById('tp-status-badge').textContent = teacher.status;
+    document.getElementById('tp-employee-code').textContent = teacher.employee_code;
+    document.getElementById('tp-phone').textContent = teacher.phone || '—';
+    document.getElementById('tp-subject').textContent = teacher.subject || 'Not set';
+    document.getElementById('tp-qualification').textContent = teacher.qualification || '—';
+    document.getElementById('tp-joining-date').textContent = teacher.joining_date || '—';
+    content.hidden = false;
+  } catch (err) {
+    loading.hidden = true;
+    document.getElementById('tp-error-msg').textContent = err.message || 'Could not load your teacher profile.';
+    errorBox.hidden = false;
+  }
+}
+
+// ---- Admin: teacher list ----
+let atlCurrentPage = 0;
+let atlSearchDebounce;
+
+async function loadAdminTeacherList(page) {
+  atlCurrentPage = page;
+  const loading = document.getElementById('atl-loading');
+  const empty = document.getElementById('atl-empty');
+  const errorBox = document.getElementById('atl-error');
+  const listEl = document.getElementById('atl-list');
+  const pagination = document.getElementById('atl-pagination');
+  loading.hidden = false; empty.hidden = true; errorBox.hidden = true; listEl.innerHTML = ''; pagination.hidden = true;
+
+  const search = document.getElementById('atl-search-input').value;
+  const status = document.getElementById('atl-status-filter').value;
+
+  try {
+    const { teachers, total, pageSize } = await TeacherService.listTeachers({ page, search, status });
+    loading.hidden = true;
+
+    if (teachers.length === 0) {
+      document.getElementById('atl-empty-title').textContent = search || status
+        ? 'No teachers match your search.'
+        : 'No teachers have been added yet.';
+      empty.hidden = false;
+      return;
+    }
+
+    listEl.innerHTML = teachers.map(t => {
+      const name = (t.profiles && t.profiles.full_name) || (t.profiles && t.profiles.email) || 'Unnamed';
+      const initial = name.trim().charAt(0).toUpperCase();
+      const badgeClass = { active: 'badge-success', inactive: 'badge-muted', on_leave: 'badge-warning' }[t.status] || 'badge-muted';
+      return `
+        <div class="profile-row" data-teacher-id="${t.id}" onclick="openAdminTeacherDetail('${t.id}')">
+          <div class="profile-row-icon">${initial}</div>
+          <div class="grow">
+            <div class="t-label">${escapeHtml(name)}</div>
+            <div class="t-support">#${escapeHtml(t.employee_code)}${t.subject ? ' · ' + escapeHtml(t.subject) : ''}</div>
+          </div>
+          <span class="badge ${badgeClass}">${t.status}</span>
+        </div>
+      `;
+    }).join('');
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    document.getElementById('atl-page-label').textContent = `Page ${page + 1} of ${totalPages}`;
+    document.getElementById('atl-prev-btn').disabled = page === 0;
+    document.getElementById('atl-next-btn').disabled = page + 1 >= totalPages;
+    pagination.hidden = false;
+  } catch (err) {
+    loading.hidden = true;
+    document.getElementById('atl-error-msg').textContent = err.message || 'Could not load teachers.';
+    errorBox.hidden = false;
+  }
+}
+
+function initAdminTeacherList() {
+  document.getElementById('atl-back').addEventListener('click', () => Router.goToOwnDashboard());
+  const manageBtn = document.getElementById('ad-manage-teachers-btn');
+  if (manageBtn) manageBtn.addEventListener('click', () => { Router.go('admin-teacher-list'); loadAdminTeacherList(0); });
+  document.getElementById('atl-add-btn').addEventListener('click', () => openAdminTeacherAdd());
+  document.getElementById('atl-search-input').addEventListener('input', () => {
+    clearTimeout(atlSearchDebounce);
+    atlSearchDebounce = setTimeout(() => loadAdminTeacherList(0), 350);
+  });
+  document.getElementById('atl-status-filter').addEventListener('change', () => loadAdminTeacherList(0));
+  document.getElementById('atl-prev-btn').addEventListener('click', () => loadAdminTeacherList(Math.max(0, atlCurrentPage - 1)));
+  document.getElementById('atl-next-btn').addEventListener('click', () => loadAdminTeacherList(atlCurrentPage + 1));
+}
+
+// ---- Admin: add teacher ----
+let ataFoundProfile = null;
+
+function openAdminTeacherAdd() {
+  ataFoundProfile = null;
+  document.getElementById('ata-lookup-email').value = '';
+  document.getElementById('ata-lookup-error').hidden = true;
+  document.getElementById('ata-lookup-result').hidden = true;
+  document.getElementById('ata-form').hidden = true;
+  document.getElementById('ata-form').reset();
+  document.getElementById('ata-joining-date').value = new Date().toISOString().slice(0, 10);
+  Router.go('admin-teacher-add');
+}
+
+function initAdminTeacherAdd() {
+  document.getElementById('ata-back').addEventListener('click', () => Router.go('admin-teacher-list'));
+
+  document.getElementById('ata-lookup-btn').addEventListener('click', async () => {
+    const emailEl = document.getElementById('ata-lookup-email');
+    const errorEl = document.getElementById('ata-lookup-error');
+    const btn = document.getElementById('ata-lookup-btn');
+    const label = document.getElementById('ata-lookup-btn-label');
+    const spinner = document.getElementById('ata-lookup-spinner');
+    errorEl.hidden = true;
+    document.getElementById('ata-lookup-result').hidden = true;
+    document.getElementById('ata-form').hidden = true;
+
+    const email = emailEl.value.trim();
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      errorEl.querySelector('span').textContent = 'Enter a valid email address.';
+      errorEl.hidden = false;
+      return;
+    }
+
+    btn.disabled = true; label.textContent = 'Searching…'; spinner.hidden = false;
+    try {
+      const profile = await TeacherService.findProfileByEmail(email);
+      if (!profile) {
+        errorEl.querySelector('span').textContent = 'No Aimers Institute account found for that email. They need to sign in at least once first.';
+        errorEl.hidden = false;
+        return;
+      }
+      ataFoundProfile = profile;
+      document.getElementById('ata-found-name').textContent = profile.full_name || '(no name set yet)';
+      document.getElementById('ata-found-email').textContent = profile.email;
+      document.getElementById('ata-lookup-result').hidden = false;
+      document.getElementById('ata-form').hidden = false;
+    } catch (err) {
+      errorEl.querySelector('span').textContent = err.message || 'Could not search right now. Please try again.';
+      errorEl.hidden = false;
+    } finally {
+      btn.disabled = false; label.textContent = 'Find account'; spinner.hidden = true;
+    }
+  });
+
+  document.getElementById('ata-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!ataFoundProfile) return;
+
+    const codeEl = document.getElementById('ata-employee-code');
+    const codeError = document.getElementById('ata-employee-code-error');
+    const formError = document.getElementById('ata-form-error');
+    const btn = document.getElementById('ata-submit-btn');
+    const label = document.getElementById('ata-submit-btn-label');
+    const spinner = document.getElementById('ata-submit-spinner');
+    codeError.hidden = true; formError.hidden = true;
+    codeEl.classList.remove('error-state');
+
+    if (!codeEl.value.trim()) {
+      codeEl.classList.add('error-state');
+      codeError.textContent = 'Employee code is required.';
+      codeError.hidden = false;
+      return;
+    }
+
+    btn.disabled = true; label.textContent = 'Creating…'; spinner.hidden = false;
+    try {
+      await TeacherService.createTeacher(ataFoundProfile.id, {
+        employeeCode: codeEl.value.trim(),
+        subject: document.getElementById('ata-subject').value.trim(),
+        qualification: document.getElementById('ata-qualification').value.trim(),
+        phone: document.getElementById('ata-phone').value.trim(),
+        joiningDate: document.getElementById('ata-joining-date').value,
+        status: document.getElementById('ata-status').value,
+      });
+      showToast('Teacher record created');
+      Router.go('admin-teacher-list');
+      loadAdminTeacherList(0);
+    } catch (err) {
+      if (err.code === 'DUPLICATE_EMPLOYEE_CODE') {
+        codeEl.classList.add('error-state');
+        codeError.textContent = err.message;
+        codeError.hidden = false;
+      } else if (err.code === 'DUPLICATE') {
+        formError.querySelector('span').textContent = 'This account already has a teacher record.';
+        formError.hidden = false;
+      } else {
+        formError.querySelector('span').textContent = err.message || 'Could not create the teacher record. Please try again.';
+        formError.hidden = false;
+      }
+    } finally {
+      btn.disabled = false; label.textContent = 'Create teacher record'; spinner.hidden = true;
+    }
+  });
+}
+
+// ---- Admin: teacher detail ----
+let atdCurrentTeacherId = null;
+
+async function openAdminTeacherDetail(teacherId) {
+  atdCurrentTeacherId = teacherId;
+  Router.go('admin-teacher-detail');
+  const loading = document.getElementById('atd-loading');
+  const content = document.getElementById('atd-content');
+  const errorBox = document.getElementById('atd-error');
+  loading.hidden = false; content.hidden = true; errorBox.hidden = true;
+
+  try {
+    const teacher = await TeacherService.getTeacherById(teacherId);
+    loading.hidden = true;
+    const name = (teacher.profiles && teacher.profiles.full_name) || (teacher.profiles && teacher.profiles.email) || 'Unnamed';
+    document.getElementById('atd-avatar-initial').textContent = name.trim().charAt(0).toUpperCase();
+    document.getElementById('atd-name').textContent = name;
+    document.getElementById('atd-email').textContent = (teacher.profiles && teacher.profiles.email) || '—';
+    document.getElementById('atd-employee-code').textContent = teacher.employee_code;
+    const badgeClass = { active: 'badge-success', inactive: 'badge-muted', on_leave: 'badge-warning' }[teacher.status] || 'badge-muted';
+    const statusBadge = document.getElementById('atd-status-badge');
+    statusBadge.textContent = teacher.status;
+    statusBadge.className = 'badge ' + badgeClass;
+    document.getElementById('atd-status-select').value = teacher.status;
+
+    document.getElementById('atd-subject').value = teacher.subject || '';
+    document.getElementById('atd-qualification').value = teacher.qualification || '';
+    document.getElementById('atd-phone').value = teacher.phone || '';
+    document.getElementById('atd-joining-date').value = teacher.joining_date || '';
+
+    content.hidden = false;
+  } catch (err) {
+    loading.hidden = true;
+    document.getElementById('atd-error-msg').textContent = err.message || 'Could not load this teacher record.';
+    errorBox.hidden = false;
+  }
+}
+
+function initAdminTeacherDetail() {
+  document.getElementById('atd-back').addEventListener('click', () => Router.go('admin-teacher-list'));
+
+  document.getElementById('atd-status-save-btn').addEventListener('click', async () => {
+    if (!atdCurrentTeacherId) return;
+    const btn = document.getElementById('atd-status-save-btn');
+    const label = document.getElementById('atd-status-save-label');
+    const spinner = document.getElementById('atd-status-spinner');
+    const newStatus = document.getElementById('atd-status-select').value;
+    btn.disabled = true; label.textContent = 'Updating…'; spinner.hidden = false;
+    try {
+      const updated = await TeacherService.updateTeacherStatus(atdCurrentTeacherId, newStatus);
+      const badgeClass = { active: 'badge-success', inactive: 'badge-muted', on_leave: 'badge-warning' }[updated.status] || 'badge-muted';
+      const statusBadge = document.getElementById('atd-status-badge');
+      statusBadge.textContent = updated.status;
+      statusBadge.className = 'badge ' + badgeClass;
+      showToast('Status updated');
+    } catch (err) {
+      showToast(err.message || 'Could not update status right now.');
+    } finally {
+      btn.disabled = false; label.textContent = 'Update'; spinner.hidden = true;
+    }
+  });
+
+  document.getElementById('atd-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!atdCurrentTeacherId) return;
+    const formError = document.getElementById('atd-form-error');
+    const btn = document.getElementById('atd-save-btn');
+    const label = document.getElementById('atd-save-btn-label');
+    const spinner = document.getElementById('atd-save-spinner');
+    formError.hidden = true;
+    btn.disabled = true; label.textContent = 'Saving…'; spinner.hidden = false;
+    try {
+      await TeacherService.updateTeacher(atdCurrentTeacherId, {
+        subject: document.getElementById('atd-subject').value.trim(),
+        qualification: document.getElementById('atd-qualification').value.trim(),
+        phone: document.getElementById('atd-phone').value.trim(),
+        joiningDate: document.getElementById('atd-joining-date').value,
+      });
+      showToast('Teacher details saved');
+    } catch (err) {
+      formError.querySelector('span').textContent = err.message || 'Could not save changes. Please try again.';
+      formError.hidden = false;
+    } finally {
+      btn.disabled = false; label.textContent = 'Save changes'; spinner.hidden = true;
+    }
+  });
+}
+
+function initTeacherManagementNav() {
+  const profileCard = document.getElementById('td-profile-card');
+  if (profileCard) profileCard.addEventListener('click', () => openTeacherProfile());
+  const tpBack = document.getElementById('tp-back');
+  if (tpBack) tpBack.addEventListener('click', () => Router.goToOwnDashboard());
+
+  initAdminTeacherList();
+  initAdminTeacherAdd();
+  initAdminTeacherDetail();
+}
+
 // ---- Logout confirmation modal ----
 function initLogoutFlow() {
   document.getElementById('profile-logout-row').addEventListener('click', () => {
@@ -661,6 +994,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPasswordResetForm();
   initLogoutFlow();
   initStudentManagementNav();
+  initTeacherManagementNav();
   try { initAuthListener(); } catch (e) { console.warn('Auth listener failed:', e); }
 
   document.getElementById('welcome-login-btn').addEventListener('click', () => Router.go('login'));
