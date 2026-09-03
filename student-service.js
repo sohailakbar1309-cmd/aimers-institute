@@ -62,7 +62,7 @@ const StudentService = (() => {
     id, admission_number, date_of_birth, gender, guardian_name, guardian_phone,
     address, batch_id, admission_date, status, created_at, updated_at,
     profiles:profile_id ( id, full_name, email, phone, avatar_url ),
-    batches:batch_id ( id, name )
+    batches:batch_id ( id, name, status, courses:course_id ( id, name ) )
   `;
 
   return {
@@ -96,7 +96,7 @@ const StudentService = (() => {
      * whole table — always range()-limited.
      * search matches admission number or the linked profile's name/email.
      */
-    async listStudents({ page = 0, search = '', status = '' } = {}) {
+    async listStudents({ page = 0, search = '', status = '', batchId = '' } = {}) {
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
@@ -107,6 +107,7 @@ const StudentService = (() => {
         .range(from, to);
 
       if (status) query = query.eq('status', status);
+      if (batchId) query = query.eq('batch_id', batchId);
       if (search && search.trim()) {
         const term = search.trim();
         // admission_number lives on students; name/email live on the joined profile.

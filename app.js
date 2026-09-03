@@ -212,7 +212,7 @@ function renderDashboardForRole() {
   buildNav(role);
 
   if (role === 'student') loadStudentDashboardBatchCard();
-  if (role === 'teacher') loadTeacherDashboardCard();
+  if (role === 'teacher') { loadTeacherDashboardCard(); loadTeacherDashboardBatches(); }
 }
 
 function buildNav(role) {
@@ -241,6 +241,8 @@ function handleNavClick(key) {
     loadAdminTeacherList(0);
     return;
   }
+  if (key === 'courses' && AuthState.getState().role === 'student') return openStudentProfile();
+  if (key === 'batches' && AuthState.getState().role === 'teacher') return openTeacherBatches();
   showToast(key.charAt(0).toUpperCase() + key.slice(1) + ' module coming in a later phase');
 }
 
@@ -286,6 +288,14 @@ async function openStudentProfile() {
     document.getElementById('sp-admission-number').textContent = student.admission_number;
     document.getElementById('sp-phone').textContent = user.phone || '—';
     document.getElementById('sp-batch').textContent = (student.batches && student.batches.name) || 'Not assigned yet';
+    document.getElementById('sp-course').textContent = (student.batches && student.batches.courses && student.batches.courses.name) || 'Not assigned yet';
+    const batchStatusEl = document.getElementById('sp-batch-status');
+    if (student.batches && student.batches.status) {
+      batchStatusEl.textContent = student.batches.status;
+      batchStatusEl.hidden = false;
+    } else {
+      batchStatusEl.hidden = true;
+    }
     document.getElementById('sp-admission-date').textContent = student.admission_date || '—';
     content.hidden = false;
   } catch (err) {
@@ -929,6 +939,586 @@ function initTeacherManagementNav() {
   initAdminTeacherDetail();
 }
 
+// ==================== COURSE & BATCH MANAGEMENT (Phase 6) ====================
+
+// ---- Admin: course list ----
+let aclSearchDebounce;
+
+async function loadAdminCourseList() {
+  const loading = document.getElementById('acl-loading');
+  const empty = document.getElementById('acl-empty');
+  const errorBox = document.getElementById('acl-error');
+  const listEl = document.getElementById('acl-list');
+  loading.hidden = false; empty.hidden = true; errorBox.hidden = true; listEl.innerHTML = '';
+
+  const search = document.getElementById('acl-search-input').value;
+  try {
+    const courses = await CourseService.listCourses({ search });
+    loading.hidden = true;
+    if (courses.length === 0) {
+      document.getElementById('acl-empty-title').textContent = search ? 'No courses match your search.' : 'No courses have been added yet.';
+      empty.hidden = false;
+      return;
+    }
+    const badgeClass = { active: 'badge-success', inactive: 'badge-muted', archived: 'badge-error' };
+    listEl.innerHTML = courses.map(c => `
+      <div class="profile-row" onclick="openAdminCourseForm('${c.id}')">
+        <div class="profile-row-icon">${escapeHtml((c.name || '?').charAt(0).toUpperCase())}</div>
+        <div class="grow">
+          <div class="t-label">${escapeHtml(c.name)}</div>
+          <div class="t-support">${escapeHtml(c.code)}</div>
+        </div>
+        <span class="badge ${badgeClass[c.status] || 'badge-muted'}">${c.status}</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    loading.hidden = true;
+    document.getElementById('acl-error-msg').textContent = err.message || 'Could not load courses.';
+    errorBox.hidden = false;
+  }
+}
+
+let acfEditingCourseId = null;
+
+function openAdminCourseForm(courseId) {
+  acfEditingCourseId = courseId || null;
+  document.getElementById('acf-form').reset();
+  document.getElementById('acf-form-error').hidden = true;
+  document.getElementById('acf-name-error').hidden = true;
+  document.getElementById('acf-code-error').hidden = true;
+  const statusField = document.getElementById('acf-status-field');
+  const codeEl = document.getElementById('acf-code');
+
+  if (courseId) {
+    document.getElementById('acf-title').textContent = 'Edit course';
+    statusField.hidden = false;
+    codeEl.disabled = true;
+    CourseService.getCourse(courseId).then(c => {
+      document.getElementById('acf-name').value = c.name || '';
+      document.getElementById('acf-code').value = c.code || '';
+      document.getElementById('acf-duration').value = c.duration || '';
+      document.getElementById('acf-description').value = c.description || '';
+      document.getElementById('acf-status').value = c.status;
+    }).catch(err => showToast(err.message || 'Could not load course.'));
+  } else {
+    document.getElementById('acf-title').textContent = 'Add course';
+    statusField.hidden = true;
+    codeEl.disabled = false;
+  }
+  Router.go('admin-course-form');
+}
+
+function initAdminCourseManagement() {
+  document.getElementById('acl-back').addEventListener('click', () => Router.goToOwnDashboard());
+  const manageBtn = document.getElementById('ad-manage-courses-btn');
+  if (manageBtn) manageBtn.addEventListener('click', () => { Router.go('admin-course-list'); loadAdminCourseList(); });
+  document.getElementById('acl-add-btn').addEventListener('click', () => openAdminCourseForm(null));
+  document.getElementById('acl-search-input').addEventListener('input', () => {
+    clearTimeout(aclSearchDebounce);
+    aclSearchDebounce = setTimeout(loadAdminCourseList, 350);
+  });
+  document.getElementById('acf-back').addEventListener('click', () => { Router.go('admin-course-list'); loadAdminCourseList(); });
+
+  document.getElementById('acf-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nameEl = document.getElementById('acf-name');
+    const codeEl = document.getElementById('acf-code');
+    const nameError = document.getElementById('acf-name-error');
+    const codeError = document.getElementById('acf-code-error');
+    const formError = document.getElementById('acf-form-error');
+    const btn = document.getElementById('acf-submit-btn');
+    const label = document.getElementById('acf-submit-btn-label');
+    const spinner = document.getElementById('acf-submit-spinner');
+    nameError.hidden = true; codeError.hidden = true; formError.hidden = true;
+    nameEl.classList.remove('error-state'); codeEl.classList.remove('error-state');
+
+    let valid = true;
+    if (!nameEl.value.trim()) { nameEl.classList.add('error-state'); nameError.textContent = 'Course name is required.'; nameError.hidden = false; valid = false; }
+    if (!acfEditingCourseId && !codeEl.value.trim()) { codeEl.classList.add('error-state'); codeError.textContent = 'Course code is required.'; codeError.hidden = false; valid = false; }
+    if (!valid) return;
+
+    btn.disabled = true; label.textContent = 'Saving…'; spinner.hidden = false;
+    try {
+      if (acfEditingCourseId) {
+        await CourseService.updateCourse(acfEditingCourseId, {
+          name: nameEl.value.trim(), duration: document.getElementById('acf-duration').value.trim(), description: document.getElementById('acf-description').value.trim(),
+        });
+        await CourseService.updateCourseStatus(acfEditingCourseId, document.getElementById('acf-status').value);
+        showToast('Course updated');
+      } else {
+        await CourseService.createCourse({
+          name: nameEl.value.trim(), code: codeEl.value.trim(), duration: document.getElementById('acf-duration').value.trim(), description: document.getElementById('acf-description').value.trim(),
+        });
+        showToast('Course created');
+      }
+      Router.go('admin-course-list');
+      loadAdminCourseList();
+    } catch (err) {
+      if (err.code === 'DUPLICATE_CODE') { codeEl.classList.add('error-state'); codeError.textContent = err.message; codeError.hidden = false; }
+      else { formError.querySelector('span').textContent = err.message || 'Could not save the course. Please try again.'; formError.hidden = false; }
+    } finally {
+      btn.disabled = false; label.textContent = acfEditingCourseId ? 'Save changes' : 'Create course'; spinner.hidden = true;
+    }
+  });
+}
+
+// ---- Admin: batch list ----
+let ablCurrentPage = 0;
+let ablSearchDebounce;
+let ablPresetBatchCourseFilterLabel = null;
+
+async function populateCourseFilterDropdown() {
+  try {
+    const courses = await CourseService.listCourses({});
+    const opts = courses.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    const filterSel = document.getElementById('abl-course-filter');
+    if (filterSel) filterSel.innerHTML = '<option value="">All courses</option>' + opts;
+    const abaSel = document.getElementById('aba-course');
+    if (abaSel) abaSel.innerHTML = '<option value="">No course yet</option>' + opts;
+    const abdSel = document.getElementById('abd-edit-course');
+    if (abdSel) abdSel.innerHTML = '<option value="">No course</option>' + opts;
+  } catch (err) { /* non-fatal — forms still work without course options */ }
+}
+
+async function loadAdminBatchList(page) {
+  ablCurrentPage = page;
+  const loading = document.getElementById('abl-loading');
+  const empty = document.getElementById('abl-empty');
+  const errorBox = document.getElementById('abl-error');
+  const listEl = document.getElementById('abl-list');
+  const pagination = document.getElementById('abl-pagination');
+  loading.hidden = false; empty.hidden = true; errorBox.hidden = true; listEl.innerHTML = ''; pagination.hidden = true;
+
+  const search = document.getElementById('abl-search-input').value;
+  const status = document.getElementById('abl-status-filter').value;
+  const courseId = document.getElementById('abl-course-filter').value;
+
+  try {
+    const { batches, total, pageSize } = await BatchService.listBatches({ page, search, status, courseId });
+    loading.hidden = true;
+    if (batches.length === 0) {
+      document.getElementById('abl-empty-title').textContent = (search || status || courseId) ? 'No batches match your search.' : 'No batches have been added yet.';
+      empty.hidden = false;
+      return;
+    }
+    const badgeClass = { active: 'badge-success', inactive: 'badge-muted', upcoming: 'badge-info', completed: 'badge-warning' };
+    listEl.innerHTML = batches.map(b => `
+      <div class="profile-row" onclick="openAdminBatchDetail('${b.id}')">
+        <div class="profile-row-icon">${escapeHtml((b.name || '?').charAt(0).toUpperCase())}</div>
+        <div class="grow">
+          <div class="t-label">${escapeHtml(b.name)}</div>
+          <div class="t-support">${b.batch_code ? escapeHtml(b.batch_code) + ' · ' : ''}${(b.courses && escapeHtml(b.courses.name)) || 'No course'}</div>
+        </div>
+        <span class="badge ${badgeClass[b.status] || 'badge-muted'}">${b.status}</span>
+      </div>
+    `).join('');
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    document.getElementById('abl-page-label').textContent = `Page ${page + 1} of ${totalPages}`;
+    document.getElementById('abl-prev-btn').disabled = page === 0;
+    document.getElementById('abl-next-btn').disabled = page + 1 >= totalPages;
+    pagination.hidden = false;
+  } catch (err) {
+    loading.hidden = true;
+    document.getElementById('abl-error-msg').textContent = err.message || 'Could not load batches.';
+    errorBox.hidden = false;
+  }
+}
+
+function initAdminBatchList() {
+  document.getElementById('abl-back').addEventListener('click', () => Router.goToOwnDashboard());
+  const manageBtn = document.getElementById('ad-manage-batches-btn');
+  if (manageBtn) manageBtn.addEventListener('click', () => {
+    document.getElementById('abl-filter-note').hidden = true;
+    document.getElementById('abl-course-filter').value = '';
+    populateCourseFilterDropdown();
+    Router.go('admin-batch-list');
+    loadAdminBatchList(0);
+  });
+  document.getElementById('abl-add-btn').addEventListener('click', () => openAdminBatchAdd());
+  document.getElementById('abl-search-input').addEventListener('input', () => {
+    clearTimeout(ablSearchDebounce);
+    ablSearchDebounce = setTimeout(() => loadAdminBatchList(0), 350);
+  });
+  document.getElementById('abl-status-filter').addEventListener('change', () => loadAdminBatchList(0));
+  document.getElementById('abl-course-filter').addEventListener('change', () => loadAdminBatchList(0));
+  document.getElementById('abl-prev-btn').addEventListener('click', () => loadAdminBatchList(Math.max(0, ablCurrentPage - 1)));
+  document.getElementById('abl-next-btn').addEventListener('click', () => loadAdminBatchList(ablCurrentPage + 1));
+}
+
+// ---- Admin: add batch ----
+function openAdminBatchAdd() {
+  document.getElementById('aba-form').reset();
+  document.getElementById('aba-form-error').hidden = true;
+  document.getElementById('aba-name-error').hidden = true;
+  document.getElementById('aba-batch-code-error').hidden = true;
+  document.getElementById('aba-end-date-error').hidden = true;
+  document.getElementById('aba-capacity-error').hidden = true;
+  populateCourseFilterDropdown();
+  Router.go('admin-batch-add');
+}
+
+function initAdminBatchAdd() {
+  document.getElementById('aba-back').addEventListener('click', () => Router.go('admin-batch-list'));
+
+  document.getElementById('aba-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nameEl = document.getElementById('aba-name');
+    const nameError = document.getElementById('aba-name-error');
+    const codeError = document.getElementById('aba-batch-code-error');
+    const endDateEl = document.getElementById('aba-end-date');
+    const endDateError = document.getElementById('aba-end-date-error');
+    const capacityEl = document.getElementById('aba-capacity');
+    const capacityError = document.getElementById('aba-capacity-error');
+    const formError = document.getElementById('aba-form-error');
+    const btn = document.getElementById('aba-submit-btn');
+    const label = document.getElementById('aba-submit-btn-label');
+    const spinner = document.getElementById('aba-submit-spinner');
+    [nameError, codeError, endDateError, capacityError, formError].forEach(el => el.hidden = true);
+    nameEl.classList.remove('error-state'); endDateEl.classList.remove('error-state'); capacityEl.classList.remove('error-state');
+
+    let valid = true;
+    if (!nameEl.value.trim()) { nameEl.classList.add('error-state'); nameError.textContent = 'Batch name is required.'; nameError.hidden = false; valid = false; }
+    const startDate = document.getElementById('aba-start-date').value;
+    if (startDate && endDateEl.value && endDateEl.value < startDate) {
+      endDateEl.classList.add('error-state'); endDateError.textContent = 'End date cannot be before the start date.'; endDateError.hidden = false; valid = false;
+    }
+    if (capacityEl.value && Number(capacityEl.value) <= 0) {
+      capacityEl.classList.add('error-state'); capacityError.textContent = 'Capacity must be a positive number.'; capacityError.hidden = false; valid = false;
+    }
+    if (!valid) return;
+
+    btn.disabled = true; label.textContent = 'Creating…'; spinner.hidden = false;
+    try {
+      await BatchService.createBatch({
+        name: nameEl.value.trim(),
+        courseId: document.getElementById('aba-course').value,
+        batchCode: document.getElementById('aba-batch-code').value.trim(),
+        startDate, endDate: endDateEl.value,
+        schedule: document.getElementById('aba-schedule').value.trim(),
+        capacity: capacityEl.value ? Number(capacityEl.value) : null,
+        status: document.getElementById('aba-status').value,
+      });
+      showToast('Batch created');
+      Router.go('admin-batch-list');
+      loadAdminBatchList(0);
+    } catch (err) {
+      if (err.code === 'DUPLICATE_CODE') { document.getElementById('aba-batch-code').classList.add('error-state'); codeError.textContent = err.message; codeError.hidden = false; }
+      else { formError.querySelector('span').textContent = err.message || 'Could not create the batch. Please try again.'; formError.hidden = false; }
+    } finally {
+      btn.disabled = false; label.textContent = 'Create batch'; spinner.hidden = true;
+    }
+  });
+}
+
+// ---- Admin: batch detail ----
+let abdCurrentBatchId = null;
+
+async function loadBatchTeachersSection(batchId) {
+  const listEl = document.getElementById('abd-teachers-list');
+  const emptyEl = document.getElementById('abd-teachers-empty');
+  listEl.innerHTML = '';
+  try {
+    const assignments = await BatchService.getBatchTeachers(batchId);
+    if (assignments.length === 0) { emptyEl.hidden = false; return; }
+    emptyEl.hidden = true;
+    listEl.innerHTML = assignments.map(a => {
+      const t = a.teachers;
+      const name = (t && t.profiles && t.profiles.full_name) || (t && t.profiles && t.profiles.email) || 'Unnamed';
+      return `
+        <div class="profile-row">
+          <div class="profile-row-icon">${escapeHtml(name.trim().charAt(0).toUpperCase())}</div>
+          <div class="grow">
+            <div class="t-label">${escapeHtml(name)}</div>
+            <div class="t-support">${escapeHtml((t && t.subject) || t.employee_code)}</div>
+          </div>
+          <button class="btn btn-icon btn-secondary" onclick="removeBatchTeacher('${batchId}', '${t.id}')" aria-label="Remove">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    showToast(err.message || 'Could not load assigned teachers.');
+  }
+}
+
+async function populateAssignTeacherSelect(excludeTeacherIds) {
+  try {
+    const { teachers } = await TeacherService.listTeachers({ status: 'active' });
+    const sel = document.getElementById('abd-assign-teacher-select');
+    const available = teachers.filter(t => !excludeTeacherIds.includes(t.id));
+    sel.innerHTML = '<option value="">Select a teacher…</option>' + available.map(t => {
+      const name = (t.profiles && t.profiles.full_name) || (t.profiles && t.profiles.email) || t.employee_code;
+      return `<option value="${t.id}">${escapeHtml(name)}</option>`;
+    }).join('');
+  } catch (err) { /* non-fatal */ }
+}
+
+async function refreshBatchDetailTeachers(batchId) {
+  await loadBatchTeachersSection(batchId);
+  try {
+    const assignments = await BatchService.getBatchTeachers(batchId);
+    await populateAssignTeacherSelect(assignments.map(a => a.teacher_id));
+  } catch (err) { /* non-fatal */ }
+}
+
+async function removeBatchTeacher(batchId, teacherId) {
+  try {
+    await BatchService.removeTeacher(batchId, teacherId);
+    showToast('Teacher removed');
+    refreshBatchDetailTeachers(batchId);
+  } catch (err) {
+    showToast(err.message || 'Could not remove teacher.');
+  }
+}
+
+async function openAdminBatchDetail(batchId) {
+  abdCurrentBatchId = batchId;
+  Router.go('admin-batch-detail');
+  const loading = document.getElementById('abd-loading');
+  const content = document.getElementById('abd-content');
+  const errorBox = document.getElementById('abd-error');
+  loading.hidden = false; content.hidden = true; errorBox.hidden = true;
+  await populateCourseFilterDropdown();
+
+  try {
+    const batch = await BatchService.getBatch(batchId);
+    const studentCount = await BatchService.getBatchStudentCount(batchId);
+    loading.hidden = true;
+
+    document.getElementById('abd-name').textContent = batch.name;
+    document.getElementById('abd-course').textContent = (batch.courses && batch.courses.name) || 'Not set';
+    document.getElementById('abd-code').textContent = batch.batch_code || '—';
+    document.getElementById('abd-dates').textContent = batch.start_date || batch.end_date ? `${batch.start_date || '?'} → ${batch.end_date || '?'}` : '—';
+    document.getElementById('abd-schedule').textContent = batch.schedule || '—';
+    document.getElementById('abd-capacity').textContent = batch.capacity != null ? `${studentCount} / ${batch.capacity}` : String(studentCount);
+    document.getElementById('abd-student-count').textContent = String(studentCount);
+    const badgeClass = { active: 'badge-success', inactive: 'badge-muted', upcoming: 'badge-info', completed: 'badge-warning' }[batch.status] || 'badge-muted';
+    const statusBadge = document.getElementById('abd-status-badge');
+    statusBadge.textContent = batch.status;
+    statusBadge.className = 'badge ' + badgeClass;
+    document.getElementById('abd-status-select').value = batch.status;
+
+    document.getElementById('abd-edit-name').value = batch.name || '';
+    document.getElementById('abd-edit-course').value = batch.course_id || '';
+    document.getElementById('abd-edit-code').value = batch.batch_code || '';
+    document.getElementById('abd-edit-start').value = batch.start_date || '';
+    document.getElementById('abd-edit-end').value = batch.end_date || '';
+    document.getElementById('abd-edit-schedule').value = batch.schedule || '';
+    document.getElementById('abd-edit-capacity').value = batch.capacity != null ? batch.capacity : '';
+
+    content.hidden = false;
+    refreshBatchDetailTeachers(batchId);
+  } catch (err) {
+    loading.hidden = true;
+    document.getElementById('abd-error-msg').textContent = err.message || 'Could not load this batch.';
+    errorBox.hidden = false;
+  }
+}
+
+function initAdminBatchDetail() {
+  document.getElementById('abd-back').addEventListener('click', () => Router.go('admin-batch-list'));
+
+  document.getElementById('abd-view-students-btn').addEventListener('click', () => {
+    ablPresetBatchCourseFilterLabel = document.getElementById('abd-name').textContent;
+    Router.go('admin-student-list');
+    const filterNote = document.getElementById('asl-error'); // reuse pattern below via student list wiring
+    loadAdminStudentListForBatch(abdCurrentBatchId, ablPresetBatchCourseFilterLabel);
+  });
+
+  document.getElementById('abd-status-save-btn').addEventListener('click', async () => {
+    if (!abdCurrentBatchId) return;
+    const btn = document.getElementById('abd-status-save-btn');
+    const label = document.getElementById('abd-status-save-label');
+    const spinner = document.getElementById('abd-status-spinner');
+    const newStatus = document.getElementById('abd-status-select').value;
+    btn.disabled = true; label.textContent = 'Updating…'; spinner.hidden = false;
+    try {
+      const updated = await BatchService.updateBatchStatus(abdCurrentBatchId, newStatus);
+      const badgeClass = { active: 'badge-success', inactive: 'badge-muted', upcoming: 'badge-info', completed: 'badge-warning' }[updated.status] || 'badge-muted';
+      const statusBadge = document.getElementById('abd-status-badge');
+      statusBadge.textContent = updated.status;
+      statusBadge.className = 'badge ' + badgeClass;
+      showToast('Status updated');
+    } catch (err) {
+      showToast(err.message || 'Could not update status right now.');
+    } finally {
+      btn.disabled = false; label.textContent = 'Update'; spinner.hidden = true;
+    }
+  });
+
+  document.getElementById('abd-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!abdCurrentBatchId) return;
+    const endDateEl = document.getElementById('abd-edit-end');
+    const endDateError = document.getElementById('abd-edit-end-error');
+    const capacityEl = document.getElementById('abd-edit-capacity');
+    const capacityError = document.getElementById('abd-edit-capacity-error');
+    const codeError = document.getElementById('abd-edit-code-error');
+    const formError = document.getElementById('abd-form-error');
+    [endDateError, capacityError, codeError, formError].forEach(el => el.hidden = true);
+    endDateEl.classList.remove('error-state'); capacityEl.classList.remove('error-state');
+
+    let valid = true;
+    const startDate = document.getElementById('abd-edit-start').value;
+    if (startDate && endDateEl.value && endDateEl.value < startDate) {
+      endDateEl.classList.add('error-state'); endDateError.textContent = 'End date cannot be before the start date.'; endDateError.hidden = false; valid = false;
+    }
+    if (capacityEl.value && Number(capacityEl.value) <= 0) {
+      capacityEl.classList.add('error-state'); capacityError.textContent = 'Capacity must be a positive number.'; capacityError.hidden = false; valid = false;
+    }
+    if (!valid) return;
+
+    const btn = document.getElementById('abd-save-btn');
+    const label = document.getElementById('abd-save-btn-label');
+    const spinner = document.getElementById('abd-save-spinner');
+    btn.disabled = true; label.textContent = 'Saving…'; spinner.hidden = false;
+    try {
+      await BatchService.updateBatch(abdCurrentBatchId, {
+        name: document.getElementById('abd-edit-name').value.trim(),
+        courseId: document.getElementById('abd-edit-course').value,
+        batchCode: document.getElementById('abd-edit-code').value.trim(),
+        startDate, endDate: endDateEl.value,
+        schedule: document.getElementById('abd-edit-schedule').value.trim(),
+        capacity: capacityEl.value ? Number(capacityEl.value) : null,
+      });
+      showToast('Batch details saved');
+      openAdminBatchDetail(abdCurrentBatchId);
+    } catch (err) {
+      if (err.code === 'DUPLICATE_CODE') { document.getElementById('abd-edit-code').classList.add('error-state'); codeError.textContent = err.message; codeError.hidden = false; }
+      else { formError.querySelector('span').textContent = err.message || 'Could not save changes. Please try again.'; formError.hidden = false; }
+    } finally {
+      btn.disabled = false; label.textContent = 'Save changes'; spinner.hidden = true;
+    }
+  });
+
+  document.getElementById('abd-assign-teacher-btn').addEventListener('click', async () => {
+    const sel = document.getElementById('abd-assign-teacher-select');
+    const errorBox = document.getElementById('abd-teacher-error');
+    errorBox.hidden = true;
+    if (!sel.value || !abdCurrentBatchId) return;
+    try {
+      await BatchService.assignTeacher(abdCurrentBatchId, sel.value);
+      showToast('Teacher assigned');
+      refreshBatchDetailTeachers(abdCurrentBatchId);
+    } catch (err) {
+      errorBox.querySelector('span').textContent = err.message || 'Could not assign teacher.';
+      errorBox.hidden = false;
+    }
+  });
+}
+
+// Loads the admin student list pre-filtered to one batch (from "View students" on batch detail).
+async function loadAdminStudentListForBatch(batchId, batchLabel) {
+  document.getElementById('asl-search-input').value = '';
+  document.getElementById('asl-status-filter').value = '';
+  const note = document.getElementById('abl-filter-note');
+  // The student list screen doesn't have its own note UI; show via toast instead to avoid duplicating markup.
+  showToast(`Showing students in ${batchLabel}`);
+  const loading = document.getElementById('asl-loading');
+  const empty = document.getElementById('asl-empty');
+  const errorBox = document.getElementById('asl-error');
+  const listEl = document.getElementById('asl-list');
+  const pagination = document.getElementById('asl-pagination');
+  loading.hidden = false; empty.hidden = true; errorBox.hidden = true; listEl.innerHTML = ''; pagination.hidden = true;
+  try {
+    const { students, total, pageSize } = await StudentService.listStudents({ page: 0, batchId });
+    loading.hidden = true;
+    if (students.length === 0) { document.getElementById('asl-empty-title').textContent = 'No students in this batch yet.'; empty.hidden = false; return; }
+    listEl.innerHTML = students.map(s => {
+      const name = (s.profiles && s.profiles.full_name) || (s.profiles && s.profiles.email) || 'Unnamed';
+      const initial = name.trim().charAt(0).toUpperCase();
+      const badgeClass = { active: 'badge-success', inactive: 'badge-muted', graduated: 'badge-info', suspended: 'badge-error' }[s.status] || 'badge-muted';
+      return `
+        <div class="profile-row" onclick="openAdminStudentDetail('${s.id}')">
+          <div class="profile-row-icon">${initial}</div>
+          <div class="grow"><div class="t-label">${escapeHtml(name)}</div><div class="t-support">#${escapeHtml(s.admission_number)}</div></div>
+          <span class="badge ${badgeClass}">${s.status}</span>
+        </div>`;
+    }).join('');
+    document.getElementById('asl-page-label').textContent = `Page 1 of ${Math.max(1, Math.ceil(total / pageSize))}`;
+    document.getElementById('asl-prev-btn').disabled = true;
+    document.getElementById('asl-next-btn').disabled = total <= pageSize;
+    pagination.hidden = false;
+  } catch (err) {
+    loading.hidden = true;
+    document.getElementById('asl-error-msg').textContent = err.message || 'Could not load students.';
+    errorBox.hidden = false;
+  }
+}
+
+// ---- Teacher: My Batches ----
+async function openTeacherBatches() {
+  Router.go('teacher-batches');
+  const loading = document.getElementById('tb-loading');
+  const empty = document.getElementById('tb-empty');
+  const errorBox = document.getElementById('tb-error');
+  const listEl = document.getElementById('tb-list');
+  loading.hidden = false; empty.hidden = true; errorBox.hidden = true; listEl.innerHTML = '';
+
+  const { user } = AuthState.getState();
+  try {
+    const teacher = await TeacherService.getCurrentTeacher(user.id);
+    if (!teacher) { loading.hidden = true; empty.hidden = false; return; }
+    const batches = await BatchService.getMyBatches(teacher.id);
+    loading.hidden = true;
+    if (batches.length === 0) { empty.hidden = false; return; }
+    const badgeClass = { active: 'badge-success', inactive: 'badge-muted', upcoming: 'badge-info', completed: 'badge-warning' };
+    listEl.innerHTML = batches.map(b => `
+      <div class="profile-row">
+        <div class="profile-row-icon">${escapeHtml((b.name || '?').charAt(0).toUpperCase())}</div>
+        <div class="grow">
+          <div class="t-label">${escapeHtml(b.name)}</div>
+          <div class="t-support">${(b.courses && escapeHtml(b.courses.name)) || 'No course'}${b.batch_code ? ' · ' + escapeHtml(b.batch_code) : ''}</div>
+        </div>
+        <span class="badge ${badgeClass[b.status] || 'badge-muted'}">${b.status}</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    loading.hidden = true;
+    document.getElementById('tb-error-msg').textContent = err.message || 'Could not load your batches.';
+    errorBox.hidden = false;
+  }
+}
+
+async function loadTeacherDashboardBatches() {
+  const { user } = AuthState.getState();
+  const loading = document.getElementById('td-batches-loading');
+  const empty = document.getElementById('td-batches-empty');
+  const listEl = document.getElementById('td-batches-list');
+  if (!user || !user.id || !loading) return;
+  loading.hidden = false; empty.hidden = true; listEl.innerHTML = '';
+  try {
+    const teacher = await TeacherService.getCurrentTeacher(user.id);
+    if (!teacher) { loading.hidden = true; empty.hidden = false; return; }
+    const batches = await BatchService.getMyBatches(teacher.id);
+    loading.hidden = true;
+    if (batches.length === 0) { empty.hidden = false; return; }
+    const badgeClass = { active: 'badge-success', inactive: 'badge-muted', upcoming: 'badge-info', completed: 'badge-warning' };
+    listEl.innerHTML = batches.slice(0, 3).map(b => `
+      <div class="profile-row">
+        <div class="profile-row-icon">${escapeHtml((b.name || '?').charAt(0).toUpperCase())}</div>
+        <div class="grow"><div class="t-label">${escapeHtml(b.name)}</div><div class="t-support">${(b.courses && escapeHtml(b.courses.name)) || 'No course'}</div></div>
+        <span class="badge ${badgeClass[b.status] || 'badge-muted'}">${b.status}</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    loading.hidden = true;
+    empty.hidden = false;
+  }
+}
+
+function initCourseBatchManagementNav() {
+  const tbBack = document.getElementById('tb-back');
+  if (tbBack) tbBack.addEventListener('click', () => Router.goToOwnDashboard());
+
+  initAdminCourseManagement();
+  initAdminBatchList();
+  initAdminBatchAdd();
+  initAdminBatchDetail();
+}
+
 // ---- Logout confirmation modal ----
 function initLogoutFlow() {
   document.getElementById('profile-logout-row').addEventListener('click', () => {
@@ -995,6 +1585,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initLogoutFlow();
   initStudentManagementNav();
   initTeacherManagementNav();
+  initCourseBatchManagementNav();
   try { initAuthListener(); } catch (e) { console.warn('Auth listener failed:', e); }
 
   document.getElementById('welcome-login-btn').addEventListener('click', () => Router.go('login'));

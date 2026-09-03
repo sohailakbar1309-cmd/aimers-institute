@@ -39,6 +39,13 @@ const SCREEN_CONFIG = Object.freeze({
   'admin-teacher-list': { access: ['admin'] },
   'admin-teacher-add': { access: ['admin'] },
   'admin-teacher-detail': { access: ['admin'] },
+
+  'admin-course-list': { access: ['admin'] },
+  'admin-course-form': { access: ['admin'] },
+  'admin-batch-list': { access: ['admin'] },
+  'admin-batch-add': { access: ['admin'] },
+  'admin-batch-detail': { access: ['admin'] },
+  'teacher-batches': { access: ['teacher'] },
 });
 
 const Router = (() => {

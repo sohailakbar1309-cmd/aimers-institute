@@ -299,11 +299,15 @@
         </div>
         <div>
           <div class="section-head"><h2 class="t-h2">Assigned batches</h2></div>
-          <div class="empty-state">
+          <div id="td-batches-loading" class="flex-col gap-3">
+            <div class="skeleton" style="height:56px; border-radius:14px;"></div>
+          </div>
+          <div id="td-batches-empty" class="empty-state" hidden>
             <div class="empty-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
             <div class="t-h3">No batches assigned yet</div>
             <div class="t-body" style="font-size:var(--fs-support);">Once an administrator assigns you a batch, it will appear here.</div>
           </div>
+          <div id="td-batches-list" class="flex-col gap-3"></div>
         </div>
       </div>
     </div>
@@ -331,6 +335,8 @@
         </div>
         <button class="btn btn-secondary" id="ad-manage-students-btn">Manage students</button>
         <button class="btn btn-secondary" id="ad-manage-teachers-btn">Manage teachers</button>
+        <button class="btn btn-secondary" id="ad-manage-courses-btn">Manage courses</button>
+        <button class="btn btn-secondary" id="ad-manage-batches-btn">Manage batches</button>
         <div>
           <div class="section-head"><h2 class="t-h2">Announcements</h2></div>
           <div class="card">
@@ -423,7 +429,9 @@
           <div class="card flex-col gap-3">
             <div class="row-between"><span class="t-label">Admission number</span><span class="t-body" id="sp-admission-number" style="color:var(--color-text-primary);">—</span></div>
             <div class="row-between"><span class="t-label">Phone</span><span class="t-body" id="sp-phone" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Course</span><span class="t-body" id="sp-course" style="color:var(--color-text-primary);">—</span></div>
             <div class="row-between"><span class="t-label">Batch</span><span class="t-body" id="sp-batch" style="color:var(--color-text-primary);">—</span></div>
+            <div class="row-between"><span class="t-label">Batch status</span><span class="badge" id="sp-batch-status" hidden>—</span></div>
             <div class="row-between"><span class="t-label">Admission date</span><span class="t-body" id="sp-admission-date" style="color:var(--color-text-primary);">—</span></div>
           </div>
         </div>
@@ -903,6 +911,273 @@
   </section>
 
   <div class="toast-wrap"><div class="toast" id="toast"><span id="toast-msg">Saved</span></div></div>
+
+<!-- ===================== ADMIN — COURSE LIST ===================== -->
+<section class="screen" id="screen-admin-course-list">
+  <div class="dash-header">
+    <div><div class="t-caption">Aimers Institute</div><div class="t-h1 mt-1">Courses</div></div>
+    <button class="btn btn-icon btn-secondary" id="acl-back" aria-label="Back to dashboard">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+  </div>
+  <div class="scroll"><div class="dash-scroll">
+    <div class="field"><input class="input" id="acl-search-input" type="text" placeholder="Search name or code"></div>
+    <button class="btn btn-primary" id="acl-add-btn">+ Add course</button>
+    <div id="acl-loading" class="flex-col gap-3"><div class="skeleton" style="height:64px; border-radius:14px;"></div><div class="skeleton" style="height:64px; border-radius:14px;"></div></div>
+    <div id="acl-empty" class="empty-state" hidden>
+      <div class="empty-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+      <div class="t-h3" id="acl-empty-title">No courses have been added yet.</div>
+    </div>
+    <div id="acl-error" class="alert alert-error" hidden><span id="acl-error-msg"></span></div>
+    <div id="acl-list" class="flex-col gap-3"></div>
+  </div></div>
+</section>
+
+<!-- ===================== ADMIN — COURSE ADD/EDIT (one form) ===================== -->
+<section class="screen" id="screen-admin-course-form">
+  <div class="auth-header">
+    <div class="auth-back">
+      <button class="btn btn-icon btn-secondary" id="acf-back" aria-label="Go back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
+    <h1 class="t-h1 mt-3" id="acf-title">Add course</h1>
+  </div>
+  <div class="auth-body">
+    <form id="acf-form" novalidate>
+      <div class="flex-col gap-3">
+        <div class="field">
+          <label class="t-label" for="acf-name">Course name</label>
+          <input class="input" id="acf-name" type="text" autocomplete="off">
+          <div class="field-error" id="acf-name-error" hidden></div>
+        </div>
+        <div class="field">
+          <label class="t-label" for="acf-code">Course code</label>
+          <input class="input" id="acf-code" type="text" autocomplete="off">
+          <div class="field-error" id="acf-code-error" hidden></div>
+        </div>
+        <div class="field">
+          <label class="t-label" for="acf-duration">Duration <span class="t-support">(optional)</span></label>
+          <input class="input" id="acf-duration" type="text" placeholder="e.g. 6 months" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="t-label" for="acf-description">Description <span class="t-support">(optional)</span></label>
+          <input class="input" id="acf-description" type="text" autocomplete="off">
+        </div>
+        <div class="field" id="acf-status-field" hidden>
+          <label class="t-label" for="acf-status">Status</label>
+          <select class="input" id="acf-status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div id="acf-form-error" class="alert alert-error" hidden><span></span></div>
+        <button class="btn btn-primary" type="submit" id="acf-submit-btn">
+          <span id="acf-submit-btn-label">Create course</span>
+          <div class="spinner" id="acf-submit-spinner" hidden></div>
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ===================== ADMIN — BATCH LIST ===================== -->
+<section class="screen" id="screen-admin-batch-list">
+  <div class="dash-header">
+    <div><div class="t-caption">Aimers Institute</div><div class="t-h1 mt-1">Batches</div></div>
+    <button class="btn btn-icon btn-secondary" id="abl-back" aria-label="Back to dashboard">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+  </div>
+  <div class="scroll"><div class="dash-scroll">
+    <div class="flex gap-2">
+      <div class="field grow" style="gap:0;"><input class="input" id="abl-search-input" type="text" placeholder="Search name or code"></div>
+      <select class="input" id="abl-status-filter" style="width:120px; flex-shrink:0;">
+        <option value="">All status</option>
+        <option value="upcoming">Upcoming</option>
+        <option value="active">Active</option>
+        <option value="completed">Completed</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+    <select class="input" id="abl-course-filter"><option value="">All courses</option></select>
+    <div id="abl-filter-note" class="alert" style="background:var(--color-accent-soft); color:var(--color-primary);" hidden>
+      <span id="abl-filter-note-text"></span>
+      <button class="btn btn-icon btn-secondary" id="abl-filter-clear-btn" style="width:auto; padding:0 var(--space-3); margin-left:auto;">Clear</button>
+    </div>
+    <button class="btn btn-primary" id="abl-add-btn">+ Add batch</button>
+    <div id="abl-loading" class="flex-col gap-3"><div class="skeleton" style="height:64px; border-radius:14px;"></div><div class="skeleton" style="height:64px; border-radius:14px;"></div></div>
+    <div id="abl-empty" class="empty-state" hidden>
+      <div class="empty-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+      <div class="t-h3" id="abl-empty-title">No batches have been added yet.</div>
+    </div>
+    <div id="abl-error" class="alert alert-error" hidden><span id="abl-error-msg"></span></div>
+    <div id="abl-list" class="flex-col gap-3"></div>
+    <div id="abl-pagination" class="row-between mt-2" hidden>
+      <button class="btn btn-secondary" id="abl-prev-btn" style="width:auto; padding:0 var(--space-4);">Prev</button>
+      <span class="t-support" id="abl-page-label">Page 1</span>
+      <button class="btn btn-secondary" id="abl-next-btn" style="width:auto; padding:0 var(--space-4);">Next</button>
+    </div>
+  </div></div>
+  <nav class="bottom-nav"></nav>
+</section>
+
+<!-- ===================== ADMIN — ADD BATCH ===================== -->
+<section class="screen" id="screen-admin-batch-add">
+  <div class="auth-header">
+    <div class="auth-back">
+      <button class="btn btn-icon btn-secondary" id="aba-back" aria-label="Go back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
+    <h1 class="t-h1 mt-3">Add batch</h1>
+  </div>
+  <div class="auth-body">
+    <form id="aba-form" novalidate>
+      <div class="flex-col gap-3">
+        <div class="field">
+          <label class="t-label" for="aba-name">Batch name</label>
+          <input class="input" id="aba-name" type="text" autocomplete="off">
+          <div class="field-error" id="aba-name-error" hidden></div>
+        </div>
+        <div class="field">
+          <label class="t-label" for="aba-course">Course <span class="t-support">(optional)</span></label>
+          <select class="input" id="aba-course"><option value="">No course yet</option></select>
+        </div>
+        <div class="field">
+          <label class="t-label" for="aba-batch-code">Batch code <span class="t-support">(optional)</span></label>
+          <input class="input" id="aba-batch-code" type="text" autocomplete="off">
+          <div class="field-error" id="aba-batch-code-error" hidden></div>
+        </div>
+        <div class="field">
+          <label class="t-label" for="aba-start-date">Start date <span class="t-support">(optional)</span></label>
+          <input class="input" id="aba-start-date" type="date">
+        </div>
+        <div class="field">
+          <label class="t-label" for="aba-end-date">End date <span class="t-support">(optional)</span></label>
+          <input class="input" id="aba-end-date" type="date">
+          <div class="field-error" id="aba-end-date-error" hidden></div>
+        </div>
+        <div class="field">
+          <label class="t-label" for="aba-schedule">Schedule <span class="t-support">(optional)</span></label>
+          <input class="input" id="aba-schedule" type="text" placeholder="e.g. Mon/Wed/Fri 5–7pm" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="t-label" for="aba-capacity">Capacity <span class="t-support">(optional)</span></label>
+          <input class="input" id="aba-capacity" type="number" min="1" autocomplete="off">
+          <div class="field-error" id="aba-capacity-error" hidden></div>
+        </div>
+        <div class="field">
+          <label class="t-label" for="aba-status">Status</label>
+          <select class="input" id="aba-status">
+            <option value="upcoming" selected>Upcoming</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div id="aba-form-error" class="alert alert-error" hidden><span></span></div>
+        <button class="btn btn-primary" type="submit" id="aba-submit-btn">
+          <span id="aba-submit-btn-label">Create batch</span>
+          <div class="spinner" id="aba-submit-spinner" hidden></div>
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ===================== ADMIN — BATCH DETAIL ===================== -->
+<section class="screen" id="screen-admin-batch-detail">
+  <div class="auth-header">
+    <div class="auth-back">
+      <button class="btn btn-icon btn-secondary" id="abd-back" aria-label="Go back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="scroll"><div class="dash-scroll">
+    <div id="abd-loading" class="flex-col gap-3"><div class="skeleton" style="height:200px; border-radius:14px;"></div></div>
+    <div id="abd-error" class="alert alert-error" hidden><span id="abd-error-msg"></span></div>
+    <div id="abd-content" hidden>
+      <div class="t-h2" id="abd-name">—</div>
+      <div class="card flex-col gap-3 mt-2">
+        <div class="row-between"><span class="t-label">Course</span><span class="t-body" id="abd-course" style="color:var(--color-text-primary);">—</span></div>
+        <div class="row-between"><span class="t-label">Batch code</span><span class="t-body" id="abd-code" style="color:var(--color-text-primary);">—</span></div>
+        <div class="row-between"><span class="t-label">Dates</span><span class="t-body" id="abd-dates" style="color:var(--color-text-primary);">—</span></div>
+        <div class="row-between"><span class="t-label">Schedule</span><span class="t-body" id="abd-schedule" style="color:var(--color-text-primary);">—</span></div>
+        <div class="row-between"><span class="t-label">Capacity</span><span class="t-body" id="abd-capacity" style="color:var(--color-text-primary);">—</span></div>
+        <div class="row-between"><span class="t-label">Students enrolled</span><span class="t-body" id="abd-student-count" style="color:var(--color-text-primary);">—</span></div>
+        <div class="row-between"><span class="t-label">Status</span><span class="badge" id="abd-status-badge">—</span></div>
+      </div>
+
+      <div class="flex gap-2 mt-2">
+        <button class="btn btn-secondary" id="abd-view-students-btn">View students</button>
+      </div>
+
+      <div class="section-head mt-2"><h2 class="t-h2">Change status</h2></div>
+      <div class="flex gap-2">
+        <select class="input" id="abd-status-select">
+          <option value="upcoming">Upcoming</option>
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <button class="btn btn-secondary" id="abd-status-save-btn" style="width:auto; padding:0 var(--space-4); flex-shrink:0;">
+          <span id="abd-status-save-label">Update</span>
+          <div class="spinner spinner-dark" id="abd-status-spinner" hidden></div>
+        </button>
+      </div>
+
+      <div class="section-head mt-2"><h2 class="t-h2">Edit details</h2></div>
+      <form id="abd-form" novalidate>
+        <div class="flex-col gap-3">
+          <div class="field"><label class="t-label" for="abd-edit-name">Batch name</label><input class="input" id="abd-edit-name" type="text" autocomplete="off"></div>
+          <div class="field"><label class="t-label" for="abd-edit-course">Course</label><select class="input" id="abd-edit-course"><option value="">No course</option></select></div>
+          <div class="field"><label class="t-label" for="abd-edit-code">Batch code</label><input class="input" id="abd-edit-code" type="text" autocomplete="off"><div class="field-error" id="abd-edit-code-error" hidden></div></div>
+          <div class="field"><label class="t-label" for="abd-edit-start">Start date</label><input class="input" id="abd-edit-start" type="date"></div>
+          <div class="field"><label class="t-label" for="abd-edit-end">End date</label><input class="input" id="abd-edit-end" type="date"><div class="field-error" id="abd-edit-end-error" hidden></div></div>
+          <div class="field"><label class="t-label" for="abd-edit-schedule">Schedule</label><input class="input" id="abd-edit-schedule" type="text" autocomplete="off"></div>
+          <div class="field"><label class="t-label" for="abd-edit-capacity">Capacity</label><input class="input" id="abd-edit-capacity" type="number" min="1" autocomplete="off"><div class="field-error" id="abd-edit-capacity-error" hidden></div></div>
+          <div id="abd-form-error" class="alert alert-error" hidden><span></span></div>
+          <button class="btn btn-primary" type="submit" id="abd-save-btn">
+            <span id="abd-save-btn-label">Save changes</span>
+            <div class="spinner" id="abd-save-spinner" hidden></div>
+          </button>
+        </div>
+      </form>
+
+      <div class="section-head mt-2"><h2 class="t-h2">Assigned teachers</h2></div>
+      <div id="abd-teachers-empty" class="empty-state" hidden><div class="t-body" style="font-size:var(--fs-support);">No teachers assigned yet.</div></div>
+      <div id="abd-teachers-list" class="flex-col gap-2"></div>
+      <div class="flex gap-2 mt-2">
+        <select class="input" id="abd-assign-teacher-select"><option value="">Select a teacher…</option></select>
+        <button class="btn btn-secondary" id="abd-assign-teacher-btn" style="width:auto; padding:0 var(--space-4); flex-shrink:0;">Assign</button>
+      </div>
+      <div id="abd-teacher-error" class="alert alert-error" hidden><span></span></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ===================== TEACHER — MY BATCHES ===================== -->
+<section class="screen" id="screen-teacher-batches">
+  <div class="dash-header">
+    <div><div class="t-caption">Aimers Institute</div><div class="t-h1 mt-1">My batches</div></div>
+    <button class="btn btn-icon btn-secondary" id="tb-back" aria-label="Back to dashboard">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+  </div>
+  <div class="scroll"><div class="dash-scroll">
+    <div id="tb-loading" class="flex-col gap-3"><div class="skeleton" style="height:64px; border-radius:14px;"></div></div>
+    <div id="tb-empty" class="empty-state" hidden>
+      <div class="empty-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+      <div class="t-h3">No batches assigned yet</div>
+    </div>
+    <div id="tb-error" class="alert alert-error" hidden><span id="tb-error-msg"></span></div>
+    <div id="tb-list" class="flex-col gap-3"></div>
+  </div></div>
+  <nav class="bottom-nav"></nav>
+</section>
 </div>
 
 <script src="config.js"></script>
@@ -913,6 +1188,8 @@
 <script src="auth-state.js"></script>
 <script src="student-service.js"></script>
 <script src="teacher-service.js"></script>
+<script src="course-service.js"></script>
+<script src="batch-service.js"></script>
 <script src="permissions.js"></script>
 <script src="router.js"></script>
 <script src="app.js"></script>
